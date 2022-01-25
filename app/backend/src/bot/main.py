@@ -12,8 +12,8 @@ from settings import settings
 
 class Bot:
   
-    POZITIVE = ('конечно', 'ага', 'пожалуй')
-    NEGATIVE = ('нет, конечно', 'ноуп', 'найн')
+    POZITIVE = ('да', 'конечно', 'ага', 'пожалуй')
+    NEGATIVE = ('нет', 'нет, конечно', 'ноуп', 'найн')
 
     def __init__(self, configs_root: str, static_url: str = None):
         self._configs_root: str = configs_root
@@ -34,10 +34,6 @@ class Bot:
             for script in scripts:
                 script_name = script.get('script')
                 self._scripts[script_name] = script
-
-                before_to_operator = script.get('before_to_operator')
-                if before_to_operator:
-                    self._scripts_before_to_operator.append(script_name)
 
 
     def get_script(self, script_name: str) -> dict:
@@ -63,22 +59,20 @@ class Bot:
                 - Последний скрипт от бота относится к группе `feedback`
 
         :param last_script_bot: Последний скрипт бота
-        :param last_inbox_message: Последнее входящее сообщение
-        :param last_outbox_message: Последнее исходящее сообщение
-        :param context_logger: Логгер
-        :param client: Объект клиента
         """
-        
-        for substring in self.NEGATIVE + self.POZITIVE:
-            if substring in message:
-                negative = substring in self.NEGATIVE
-                pozitive = substring in self.POZITIVE
-                break
-        print(pozitive, negative)
         if message.startswith("/start"):
            return  self.get_main_script()
+
+        data = {}
+        for substring in self.NEGATIVE + self.POZITIVE:
+            if substring in message.lower():
+                status = 'negative' if substring in self.NEGATIVE else 'positive'
+                data.update({'body': 'good', "ststus": status})
+                break
+            else:
+              data.update({'body': 'Попробуйте ещё раз', 'bot_script': None})
         
-        return "await self.get_main_node()"
+        return data
 
  
 
