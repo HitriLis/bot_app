@@ -1,0 +1,139 @@
+version: '3.7'
+
+networks:
+  default:
+    internal: true
+  traefik:
+    external:
+      name: traefik
+  services:
+    external:
+      name: services
+
+services:
+
+  # ####################################################################################################################
+  # Веб-сервисы (backend)
+  # ####################################################################################################################
+  backend:
+    networks:
+      - traefik
+      - services
+      - default
+    expose:
+      - 8000
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_backend.rule=Host(`api.${DOMAIN}`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_backend.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_backend.tls.certresolver=le
+    environment:
+      DATABASE_URL: 'postgresql://${PSQL_USER}:${PSQL_PASS}@postgres:5432/${PSQL_DB}'
+      RABBITMQ_URL: 'amqp://${MQ_USER}:${MQ_PASS}@rabbitmq/${MQ_VHOST}'
+      REDIS_URL: 'redis://redis:6379/1'
+      MQ_HOSTS: 'rabbitmq'
+
+  backend-sandbox:
+    networks:
+      - traefik
+      - services
+      - default
+    expose:
+      - 8000
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_backend_sandbox.rule=Host(`api-sandbox.${DOMAIN}`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_backend_sandbox.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_backend_sandbox.tls.certresolver=le
+    environment:
+      DATABASE_URL: 'postgresql://${PSQL_USER}:${PSQL_PASS}@postgres:5432/${PSQL_DB}'
+      RABBITMQ_URL: 'amqp://${MQ_USER}:${MQ_PASS}@rabbitmq/${MQ_VHOST}'
+      REDIS_URL: 'redis://redis:6379/1'
+      MQ_HOSTS: 'rabbitmq'
+
+  backend-nginx:
+    build:
+      context: ./docker/backend-nginx/
+    restart: on-failure
+    networks:
+      - traefik
+      - default
+    expose:
+      - 80
+    volumes:
+      - ../../app/backend/media:/usr/share/nginx/html/media
+      - ../../app/backend/src/static:/usr/share/nginx/html/static
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_backend_nginx.rule=(Host(`api.${DOMAIN}`) && (PathPrefix(`/media`) || PathPrefix(`/static`))) || (Host(`${DOMAIN}`) && (PathPrefix(`/static`) || PathPrefix(`/media`)))
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_backend_nginx.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_backend_nginx.tls.certresolver=le
+
+  aws-s3-proxy:
+    networks:
+      - traefik
+      - default
+    expose:
+      - 8000
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME}_aws_s3_proxy_stripprefix.stripprefix.prefixes=/uploads
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_aws_s3_proxy.rule=(Host(`api.${DOMAIN}`) && PathPrefix(`/uploads`)) || (Host(`${DOMAIN}`) && PathPrefix(`/uploads`))
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_aws_s3_proxy.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_aws_s3_proxy.tls.certresolver=le
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_aws_s3_proxy.middlewares=${COMPOSE_PROJECT_NAME}_aws_s3_proxy_stripprefix@docker
+
+  # ####################################################################################################################
+  # Веб-сервисы (frontend)
+  # ####################################################################################################################
+  frontend:
+    networks:
+      - traefik
+      - default
+    expose:
+      - 3000
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_frontend.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_frontend.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}_frontend.tls.certresolver=le
+    environment:
+      SYSTEM__DEBUG__FRONTEND: $SYSTEM__DEBUG__FRONTEND
+
+  # ####################################################################################################################
+  # Документация
+  # ####################################################################################################################
+  # docs:
+  #  build:
+  #    context: ../../
+  #    dockerfile: ci/dev/docker/docs/Dockerfile.alpine
+  #  restart: on-failure
+  #  networks:
+  #    - traefik
+  #    - default
+  #  expose:
+  #    - 80
+  #  labels:
+  #    - traefik.enable=true
+  #    - traefik.docker.network=traefik
+  #    - traefik.http.routers.${COMPOSE_PROJECT_NAME}_docs.rule=Host(`docs.api.${DOMAIN}`)
+  #    - traefik.http.routers.${COMPOSE_PROJECT_NAME}_docs.tls=true
+  #    - traefik.http.routers.${COMPOSE_PROJECT_NAME}_docs.tls.certresolver=le
+
+  # ####################################################################################################################
+  # Фоновые задачи (async_tasks)
+  # ####################################################################################################################
+  watcher_async_tasks:
+    networks:
+      - services
+      - default
+    environment:
+      DATABASE_URL: 'postgresql://${PSQL_USER}:${PSQL_PASS}@postgres:5432/${PSQL_DB}'
+      RABBITMQ_URL: 'amqp://${MQ_USER}:${MQ_PASS}@rabbitmq/${MQ_VHOST}'
+      REDIS_URL: 'redis://redis:6379/1'
+      MQ_HOSTS: 'rabbitmq'

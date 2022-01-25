@@ -1,0 +1,38 @@
+version: '3.7'
+
+x-backend-env:
+  &backend-env
+    DATABASE_URL: 'postgresql://${PSQL_USER}:${PSQL_PASS}@psql:5432/${PSQL_DB}'
+    DEBUG: ${APP_DEBUG}
+    API_URL: ${APP_API_URL}
+    MEDIA_DEBUG: ${APP_MEDIA_DEBUG}
+    DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE}
+    ERROR_SCENARIO_DEBUG: 1
+
+x-backend:
+  &backend
+  build:
+    context: ../../
+    dockerfile: ci/dev/docker/backend/Dockerfile
+  restart: on-failure
+  tty: true
+  volumes:
+    - "../../app/backend/:/var/app"
+  environment:
+    <<: *backend-env
+  deploy:
+    resources:
+      limits:
+        cpus: "2"
+        memory: "4G"
+
+services:
+
+  # ####################################################################################################################
+  # Веб-сервисы (backend)
+  # ####################################################################################################################
+  backend:
+    <<: *backend
+    sysctls:
+      - 'net.core.somaxconn=32768'                      # Максимальное число открытых сокетов, ждущих соединения
+      - 'net.ipv4.ip_local_port_range=1024 65000'       # Диапазон доступных портов
