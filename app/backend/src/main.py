@@ -61,7 +61,6 @@ async def message(request: Request):
 @app.get('/statistics')
 async def statistics(request: Request):
     statistics = await Message.objects.get_statistics()
-    print(statistics)
     return {
       'data': statistics
     }
