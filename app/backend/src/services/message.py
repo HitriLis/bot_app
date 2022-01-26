@@ -1,7 +1,5 @@
 import schemas
-from bot import Bot, bot
 from models import Message
-
 
 async def create_bot_message(body, **kwargs):
     return await create(

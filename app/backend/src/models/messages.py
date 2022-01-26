@@ -24,6 +24,41 @@ class MessageManager:
     
         return Message(**kwargs)
 
+    @staticmethod
+    async def get_last_script_bot(client_id: int):
+        last_message = await database.fetch_one(
+            """
+            SELECT
+                bot_script
+            FROM messages
+            WHERE
+                client_id = :client_id AND
+                bot_script IS NOT NULL
+            ORDER BY date_created DESC
+            LIMIT 1
+            """, {'client_id': client_id}
+        )
+        if last_message:
+            return last_message[0]
+        return None
+    
+    @staticmethod
+    async def get_statistics():
+        statistics = await database.fetch_all(
+            """
+            SELECT
+                COUNT(bot_script),
+                bot_script
+            FROM messages
+            WHERE
+                bot_script IS NOT NULL
+            GROUP BY
+                bot_script
+            """
+        )
+
+        return {x[1]: x[0] for x in statistics}
+
     async def get_message(self, message_id):
         """
         Получение одного сообщения по message_id

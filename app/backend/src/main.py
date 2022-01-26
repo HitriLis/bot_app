@@ -2,13 +2,9 @@ import asyncio
 import os
 
 
-from fastapi import FastAPI, Request, HTTPException, status, File, Header, Form, UploadFile, Response
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import APIKeyHeader
-import httpagentparser
-
-import models
+from models import Message
 import schemas
 from services import messages_create
 from bot import bot
@@ -17,7 +13,6 @@ from database import database
 from settings import settings
 
 app = FastAPI()
-api_key = APIKeyHeader(name='Authorization')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -55,15 +50,21 @@ async def message(request: Request):
     await messages_create(
        client_id=client_id,
        body=message,
-       bot_script='main'
+       bot_script= bot_respons.get('script_name')
     )
-    # bot_respons = await bot.get_start_script(
-    #    client_id=client_id,
-    #    message=message
-    # )
+    return {
+      'data': {
+        "body": bot_respons.get('body')
+      }
+    }
 
-    return {'status': bot_respons}
-
+@app.get('/statistics')
+async def statistics(request: Request):
+    statistics = await Message.objects.get_statistics()
+    print(statistics)
+    return {
+      'data': statistics
+    }
 
 
 # Для запуска отладчика и профайлера
